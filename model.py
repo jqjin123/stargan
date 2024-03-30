@@ -52,14 +52,14 @@ class Generator(nn.Module):
         layers.append(nn.Tanh())
         self.main = nn.Sequential(*layers)
 
-    def forward(self, x, c):
+    def forward(self, x, c):  # 输入图像x [batch_size, n_channel, cols, rows], 目标领域的标签c [batch_size, n_dim]
         # Replicate spatially and concatenate domain information.
         # Note that this type of label conditioning does not work at all if we use reflection padding in Conv2d.
         # This is because instance normalization ignores the shifting (or bias) effect.
         c = c.view(c.size(0), c.size(1), 1, 1)
         c = c.repeat(1, 1, x.size(2), x.size(3))
         x = torch.cat([x, c], dim=1)
-        return self.main(x)
+        return self.main(x)  # 生成器的输入为[batch_size, n_channel+n_dim, cols, rows], 生成器的输出为[batch_size, n_channel, cols, rows]
 
 
 class Discriminator(nn.Module):
@@ -81,8 +81,17 @@ class Discriminator(nn.Module):
         self.conv1 = nn.Conv2d(curr_dim, 1, kernel_size=3, stride=1, padding=1, bias=False)
         self.conv2 = nn.Conv2d(curr_dim, c_dim, kernel_size=kernel_size, bias=False)
         
-    def forward(self, x):
+    def forward(self, x): # 输入图像x [batch_size, n_channel, cols, rows]
         h = self.main(x)
         out_src = self.conv1(h)
         out_cls = self.conv2(h)
+        # 真假判断out_src [batch_size, 1, s1, s2]  类别划分 [batch_size, n_dim]
         return out_src, out_cls.view(out_cls.size(0), out_cls.size(1))
+
+if __name__ == "__main__":
+    inputs = torch.randn(16, 3, 128, 128)
+    net = Discriminator()
+    net.eval()
+    outputs = net.forward(inputs)
+    print(outputs[0].size())  # [16, 1, 2, 2]
+    print(outputs[1].size())  # [16, 5]
